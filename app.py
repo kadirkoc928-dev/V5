@@ -1,38 +1,50 @@
 import streamlit as st
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from scanner import scan_ticker, get_all_tickers
+
 
 st.set_page_config(page_title="TradeScanner V2", layout="wide")
 
-st.title("📊 TradeScanner V2 - FULL MARKET SCANNER")
+st.title("📊 TradeScanner V2 (Simple + Stable)")
 
-mode = st.selectbox("Modus", ["Top 50", "Top 200", "ALL STOCKS"])
 
-if st.button("🚀 SCAN STARTEN"):
+# =========================
+# SCAN BUTTON
+# =========================
+if st.button("🚀 START SCAN"):
 
-    if mode == "Top 50":
-        tickers = get_all_tickers()[:50]
-    elif mode == "Top 200":
-        tickers = get_all_tickers()[:200]
-    else:
-        tickers = get_all_tickers()
+    tickers = get_all_tickers()
 
     results = []
-
     progress = st.progress(0)
+    status = st.empty()
 
-    for i, t in enumerate(tickers):
-        res = scan_ticker(t)
-        if res:
-            results.append(res)
+    def run(t):
+        return scan_ticker(t)
 
-        progress.progress((i+1)/len(tickers))
+    with ThreadPoolExecutor(max_workers=10) as executor:
 
-    if results:
-        df = pd.DataFrame(results)
+        futures = {executor.submit(run, t): t for t in tickers}
+
+        for i, f in enumerate(as_completed(futures)):
+
+            result = f.result()
+
+            if result:
+                results.append(result)
+
+            progress.progress(i / len(tickers))
+            status.text(f"Scanned: {i}/{len(tickers)} | Hits: {len(results)}")
+
+    df = pd.DataFrame(results)
+
+    if df.empty:
+        st.warning("Keine Signale gefunden")
+    else:
         df = df.sort_values("Score", ascending=False)
 
-        st.success(f"{len(df)} Signale gefunden")
+        st.success(f"{len(df)} Treffer gefunden")
+
         st.dataframe(df, use_container_width=True)
-    else:
-        st.error("Keine Treffer gefunden")
