@@ -1,9 +1,10 @@
 import yfinance as yf
 from indicators import add_indicators
 
-# MARKET FILTER
+# MARKET REGIME
 def get_market_regime():
     spy = yf.Ticker("SPY").history(period="6mo")
+
     spy["SMA200"] = spy["Close"].rolling(200).mean()
     spy["SMA50"] = spy["Close"].rolling(50).mean()
 
@@ -14,7 +15,7 @@ def get_market_regime():
     return "BEAR"
 
 
-# FILTER
+# FILTER LOGIC
 def filter_signal(row):
     score = 0
 
@@ -32,16 +33,18 @@ def filter_signal(row):
     return score >= 3
 
 
-# SCORE
+# SWING SCORE
 def swing_score(row):
     score = 0
 
     if row["Close"] > row["SMA20"]:
         score += 10
+
     if row["SMA20"] > row["SMA50"]:
         score += 10
 
-    if row["RSI"] between_safe(row["RSI"]):
+    # RSI ZONE
+    if 45 <= row["RSI"] <= 70:
         score += 20
 
     if row["ADX"] > 25:
@@ -54,10 +57,6 @@ def swing_score(row):
         score += 20
 
     return min(100, score)
-
-
-def between_safe(rsi):
-    return 45 <= rsi <= 70
 
 
 # SCAN SINGLE STOCK
@@ -85,5 +84,6 @@ def scan_ticker(ticker):
             "Volume Ratio": round(latest["VOL_RATIO"], 2)
         }
 
-    except:
+    except Exception as e:
+        print(f"Error {ticker}: {e}")
         return None
